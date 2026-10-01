@@ -1,0 +1,61 @@
+﻿flowchart LR
+    USER[Support users: L1 / L2 / L3 / Admin] --> UI[React + Vite single-page application]
+    UI -->|Bearer token, JSON| API[FastAPI REST API]
+
+    subgraph AUTHZ[API and Access Control]
+        API --> AUTH[Authentication and role authorization]
+        API --> INCIDENT[Search, triage, resolve, ticket workflow]
+        API --> FEEDBACK[Feedback, profiles, notifications]
+        API --> ADMIN[Users, analytics, evaluation, provider settings]
+    end
+
+    subgraph PIPELINE[Incident Intelligence Pipeline]
+        GUARD[Input guardrails and PII filtering] --> TRIAGE[Classification, priority, SLA, routing]
+        TRIAGE --> RETRIEVE[Hybrid retrieval and metadata filters]
+        RETRIEVE --> RCA[Root cause analysis]
+        RCA --> ANSWER[Grounded resolution assistance]
+        ANSWER --> SAFE[Safety and grounding validation]
+        SAFE --> TICKET[L1 to L2 to L3 ticket handoff]
+    end
+    INCIDENT --> GUARD
+    TICKET --> API
+
+    subgraph INDEX[Local Incident Knowledge Base]
+        CSV[data/incidents.csv] --> PREP[Normalize, clean, deduplicate, searchable text]
+        PREP --> CORPUS[Incident descriptions and resolutions]
+        CORPUS --> WORD[Word n-gram TF-IDF]
+        CORPUS --> CHAR[Character n-gram TF-IDF]
+        CORPUS --> SEM[Local SVD semantic vectors]
+        CORPUS --> TOKENS[Keyword / token overlap]
+        WORD --> RANK[Weighted ranking and local reranking]
+        CHAR --> RANK
+        SEM --> RANK
+        TOKENS --> RANK
+    end
+    RANK --> RETRIEVE
+
+    subgraph PROVIDERS[Optional LLM Providers and Offline Fallback]
+        ANSWER --> KEYS[OpenRouter / Google Gemini / OpenAI]
+        KEYS -->|Enabled and configured| LLM[Grounded provider answer]
+        KEYS -->|Disabled, missing key, or unavailable| FALLBACK[Local evidence and deterministic fallback]
+        LLM --> SAFE
+        FALLBACK --> SAFE
+    end
+
+    subgraph DB[SQLite Persistence]
+        USERS[(Users and role profiles)]
+        TICKETS[(Tickets and handoff event history)]
+        OTHER[(Feedback, incidents, settings, notifications, audit, search history)]
+    end
+    AUTH <--> USERS
+    INCIDENT <--> TICKETS
+    INCIDENT <--> OTHER
+    FEEDBACK <--> OTHER
+    ADMIN <--> OTHER
+    PREP -->|Admin-created incidents| OTHER
+
+    subgraph EVAL[Evaluation]
+        CASES[Representative incident queries] --> METRICS[Precision@1, Hit Rate@3/5, MRR, MAP, latency]
+        METRICS --> REPORT[evaluation_results.json and Admin Evaluation Studio]
+    end
+    RETRIEVE --> CASES
